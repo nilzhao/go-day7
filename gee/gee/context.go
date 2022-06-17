@@ -18,7 +18,17 @@ type Context struct {
 	Params map[string]string
 	// response info
 	StatusCode int
+	// middleware
+	handlers []HandlerFunc
+	index    int
 }
+
+type ResponseCode int
+
+const (
+	OK_CODE   ResponseCode = 200
+	FAIL_CODE ResponseCode = 400
+)
 
 func newContext(w http.ResponseWriter, req *http.Request) *Context {
 	return &Context{
@@ -26,6 +36,15 @@ func newContext(w http.ResponseWriter, req *http.Request) *Context {
 		Req:    req,
 		Path:   req.URL.Path,
 		Method: req.Method,
+		index:  -1,
+	}
+}
+
+func (c *Context) Next() {
+	c.index++
+	s := len(c.handlers)
+	for ; c.index < s; c.index++ {
+		c.handlers[c.index](c)
 	}
 }
 
@@ -74,4 +93,19 @@ func (c *Context) HTML(code int, html string) {
 	c.SetHeader("Content-Type", "text/html")
 	c.Status(code)
 	c.Writer.Write([]byte(html))
+}
+
+func (c *Context) OK(data any) {
+	c.JSON(http.StatusOK, H{
+		"code":    OK_CODE,
+		"message": "success",
+		"data":    data,
+	})
+}
+
+func (c *Context) Fail(message string) {
+	c.JSON(http.StatusOK, H{
+		"code":    FAIL_CODE,
+		"message": message,
+	})
 }

@@ -3,22 +3,24 @@ package gee
 import (
 	"log"
 	"net/http"
+	"strings"
 )
 
 type HandlerFunc func(*Context)
 
-type RouterGroup struct {
-	prefix      string
-	middlewares []HandlerFunc // 支持中间件
-	parent      *RouterGroup  // 支持嵌套
-	engine      *Engine       // 共享 Engine 实例
-}
+type (
+	RouterGroup struct {
+		prefix      string
+		middlewares []HandlerFunc // 支持中间件
+		engine      *Engine       // 共享 Engine 实例
+	}
 
-type Engine struct {
-	*RouterGroup
-	router *router
-	groups []*RouterGroup // 存储所有的 group
-}
+	Engine struct {
+		*RouterGroup
+		router *router
+		groups []*RouterGroup // 存储所有的 group
+	}
+)
 
 // New is the constructor of gee.Engine
 func New() *Engine {
@@ -36,8 +38,7 @@ func New() *Engine {
 func (group *RouterGroup) Group(prefix string) *RouterGroup {
 	engine := group.engine
 	newGroup := &RouterGroup{
-		prefix: prefix,
-		parent: group,
+		prefix: group.prefix + prefix,
 		engine: engine,
 	}
 	engine.groups = append(engine.groups, newGroup)
@@ -58,6 +59,11 @@ func (group *RouterGroup) POST(pattern string, handler HandlerFunc) {
 	group.addRoute("POST", pattern, handler)
 }
 
+// Use is defined to add middleware to the group
+func (group *RouterGroup) Use(middlewares ...HandlerFunc) {
+	group.middlewares = append(group.middlewares, middlewares...)
+}
+
 func (e *Engine) Run(addr string) (err error) {
 	return http.ListenAndServe(addr, e)
 }
@@ -73,6 +79,13 @@ func (e *Engine) POST(pattern string, handler HandlerFunc) {
 }
 
 func (e *Engine) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	var middlewares []HandlerFunc
+	for _, group := range e.groups {
+		if strings.HasPrefix(req.URL.Path, group.prefix) {
+			middlewares = append(middlewares, group.middlewares...)
+		}
+	}
 	c := newContext(w, req)
+	c.handlers = middlewares
 	e.router.handle(c)
 }
