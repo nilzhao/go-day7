@@ -21,6 +21,8 @@ type Context struct {
 	// middleware
 	handlers []HandlerFunc
 	index    int
+
+	engine *Engine
 }
 
 type ResponseCode int
@@ -89,12 +91,6 @@ func (c *Context) Data(code int, data []byte) {
 	c.Writer.Write(data)
 }
 
-func (c *Context) HTML(code int, html string) {
-	c.SetHeader("Content-Type", "text/html")
-	c.Status(code)
-	c.Writer.Write([]byte(html))
-}
-
 func (c *Context) OK(data any) {
 	c.JSON(http.StatusOK, H{
 		"code":    OK_CODE,
@@ -108,4 +104,13 @@ func (c *Context) Fail(message string) {
 		"code":    FAIL_CODE,
 		"message": message,
 	})
+}
+
+func (c *Context) HTML(code int, name string, data any) {
+	c.SetHeader("Content-Type", "text/html; charset=utf-8")
+	c.Status(code)
+	err := c.engine.htmlTemplates.ExecuteTemplate(c.Writer, name, data)
+	if err != nil {
+		c.Fail(err.Error())
+	}
 }
