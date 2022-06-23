@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"gee/demo/middleware"
 	"gee/gee"
 	"html/template"
 	"net/http"
@@ -20,11 +19,11 @@ func FormatAsDate(t time.Time) string {
 }
 
 func main() {
-	r := gee.New()
-	r.Use(middleware.Logger) // global middleware
+	r := gee.Default()
 	r.SetFuncMap(template.FuncMap{
 		"FormatAsDate": FormatAsDate,
 	})
+
 	r.LoadHTMLGlob("templates/*")
 	r.Static("/assets", "./static")
 
@@ -47,6 +46,11 @@ func main() {
 			"title": "date",
 			"now":   time.Date(2022, 1, 1, 0, 0, 0, 0, time.UTC),
 		})
+	})
+
+	r.GET("/panic", func(c *gee.Context) {
+		names := []string{"a"}
+		c.String(http.StatusOK, names[100])
 	})
 
 	r.Run(":9999")
